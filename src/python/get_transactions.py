@@ -1,25 +1,28 @@
 #%%################
 ##### IMPORTS #####
 ###################
-from dotenv import load_dotenv
 import os
+import pandas as pd
+import numpy as np
 import requests
+from dotenv import load_dotenv
+from use_up_api.transactions import getTransactions, transDict_to_df
 
 #%%#################
 ##### LOAD API #####
 ####################
 load_dotenv()  # Load variables from .env file
 api_key = os.getenv('API_KEY')
+base_url = 'https://api.up.com.au/api/v1'
+headers = {
+        "Authorization": f'Bearer {api_key}'
+    }
+outPath = './output/transactions.csv'
+os.makedirs(os.path.dirname(outPath), exist_ok = True)
 
 #%%###################
 ##### VERIFY API #####
 ######################
-
-base_url = 'https://api.up.com.au/api/v1'
-headers = {
-    "Authorization": f'Bearer {api_key}'
-}
-
 response = requests.get(F'{base_url}/util/ping', headers=headers)
 
 if response.status_code == 200:
@@ -30,23 +33,29 @@ else:
 #%%#####################
 ##### TRANSACTIONS #####
 ########################
-params = {
-    'page[size]': 30,
-    'filter[since]':'2024-02-19T00:00:00+10:00',
-    }
+if os.path.exists(outPath):
+    existing = pd.read_csv(outPath)
+    since = existing['createdAt'][0]
+else:
+    since = None
 
-# Get most recent request
-first_request= requests.get(f'{base_url}/transactions', headers = headers)
-transactions = first_request.json()['data']
-# Add to a list for all transactions
-all_transactions = transactions.copy()
-# Get links
-links = first_request.json()['links']
+transDict = getTransactions(api_key, base_url= base_url, since = since, headers = headers)
 
-# While there is a next link to click
-# Keep going next, and extend list of transactions
-while(links['next'] != None):
-    next_request = requests.get(links['next'], headers=headers, params=params)
-    next_transaction = next_request.json()['data']
-    all_transactions.extend(next_transaction)
-    links = next_request.json()['links']
+attrList = [
+    'status', 'rawText', 'description', 'amount', 
+    'message', 'cardPurchaseMethod', 'settledAt', 
+    'createdAt', 'transactionType', 'Note'
+    ]
+
+transDF = transDict_to_df(transDict, attrList)
+
+if os.path.exists(outPath):
+    existingIDs = list(np.unique(existing['id']))
+    transDF = transDF[~transDF['id'].isin(existingIDs)]
+    if len(transDF) != 0:
+        transDF = pd.concat([existing, transDF])
+        transDF.to_csv(outPath, index = False)
+    else:
+        print('No new transactions')
+else:
+    transDF.to_csv(outPath, index = False)
