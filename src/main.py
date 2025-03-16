@@ -1,5 +1,5 @@
 from src.api import ping_api
-from transactions import getTransactions, transDict_to_df
+from src.transactions import process_transactions
 
 if __name__ == '__main__':
     ping_api()

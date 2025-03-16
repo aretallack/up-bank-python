@@ -91,6 +91,7 @@ def process_transactions():
     transDF = transDict_to_df(transDict, attrList)
 
     if os.path.exists(TRANSACTIONS_OUT):
+        print(f'Appending new transactions to {os.path.basename(TRANSACTIONS_OUT)}')
         existing = pd.read_csv(TRANSACTIONS_OUT)
         merged = pd.concat([existing, transDF])
         merged = merged.groupby('id').aggregate({
@@ -109,15 +110,14 @@ def process_transactions():
             'cardNumberSuffix': 'last',
             'parentCategory': 'last'
         })
-        if len(transDF) != 0:
-            transDF = pd.concat([transDF, existing])
-            transDF = transDF.sort_values('createdAt', ascending = False)
-            transDF.to_csv(TRANSACTIONS_OUT, index = False)
-        else:
-            print('No new transactions')
+        # if len(transDF) != 0:
+            # transDF = pd.concat([transDF, existing])
+        merged = merged.sort_values('createdAt', ascending = False)
+        merged.to_csv(TRANSACTIONS_OUT, index = False)
+        # else:
+            # print('No new transactions')
     else:
         transDF.to_csv(TRANSACTIONS_OUT, index = False)
-
 
 if __name__ == '__main__':
     process_transactions()
