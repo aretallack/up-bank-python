@@ -117,6 +117,7 @@ def process_transactions():
         # else:
             # print('No new transactions')
     else:
+        print(f'Saving transactiosn to {os.path.basename(TRANSACTIONS_OUT)}')
         transDF.to_csv(TRANSACTIONS_OUT, index = False)
 
 if __name__ == '__main__':
