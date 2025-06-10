@@ -1,93 +1,16 @@
 #%%########
 ##### #####
 ###########
-import requests
-import json
-import re
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from src.api import ping_api
+from src.api import ping_api, getAccounts, getTransactionIDs, getTransaction, getAllTransactions
 from src.config import BASE_URL, HEADERS, TRANSACTIONS_OUT
-from src.functions import flattenDictionary
-
 from src.getBalances import getBalance
 
 #%%########
 ##### #####
 ###########
-
-def getAccounts(BASE_URL = BASE_URL, HEADERS = HEADERS):
-    request = requests.get(f'{BASE_URL}/accounts', headers = HEADERS)
-    data = request.json()['data']
-    accounts = [(x['attributes']['displayName'], x['attributes']['accountType'], x['id']) for x in data]
-    accounts = [(re.sub(r'[^a-zA-Z]', '', item[0]), item[1], item[2]) for item in accounts]
-    return accounts
-
-def firstRequest(params, url, HEADERS = HEADERS):
-    request = requests.get(url, headers = HEADERS, params = params)
-    return request
-
-def iteratePages(request, params, HEADERS = HEADERS):
-    # Add to a list for all transactions
-    allData = request.json()['data'].copy()
-    # Get links
-    links = request.json()['links']
-
-    # While there is a next link to click
-    # Keep going next, and extend list of transactions
-    while(links['next'] != None):
-        nextRequest = requests.get(links['next'], headers=HEADERS, params=params)
-        nextData = nextRequest.json()['data']
-        allData.extend(nextData)
-        links = nextRequest.json()['links']
-    return allData
-
-def getTransactionIDs(byAccount = False, BASE_URL = BASE_URL, HEADERS = HEADERS, accounts = None):
-    '''
-    Function to get transaction IDs, either accross all accounts, or per account.
-    '''
-    if byAccount:
-        if accounts == None:
-            print('accounts list from getAccounts() must be specified')
-            return
-        accountNames = [x[0] for x in accounts]
-        transactions = {account: '' for account in accountNames}
-        for account in accounts:
-            name, accountType, accountID = account
-            url = f'{BASE_URL}/accounts/{accountID}/transactions'
-            print(f'Getting transaction IDs for {name}')
-        
-            request = firstRequest(params, url, HEADERS)
-            data = iteratePages(request, params, HEADERS)
-            transactionIDs = [x['id'] for x in data]
-            transactions[name] = transactionIDs
-        return transactions
-            
-    print('Getting transaction IDs')
-    url = f'{BASE_URL}/transactions'
-    request = firstRequest(params, url, HEADERS)
-    data = iteratePages(request, HEADERS, params)
-    transactionIDs = [x['id'] for x in data]
-    return transactionIDs
-
-def getTransactionData(transactionID, HEADERS = HEADERS, BASE_URL = BASE_URL):
-    '''
-    Funtion to get transaction data, given a transaction ID
-    '''
-    url = f'{BASE_URL}/transactions/{transactionID}'
-    request = firstRequest(params, url, HEADERS)
-    data = request.json()
-    return data
-
-
-def getAllTransactions(params, BASE_URL = BASE_URL, HEADERS = HEADERS):
-    url = f'{BASE_URL}/transactions'
-    print(f'Getting transactions{f" since {params['filter[since]']}" if not params["filter[since]"] == None else ""}')
-    request = firstRequest(params, url)
-    data = iteratePages(request, params)
-    return data
-
 
 def manualFlattenDictionary(dictionary: dict, paths: list[str], names: list[str]):
     if len(paths) != len(names):
@@ -156,12 +79,6 @@ def mergeToExisting(TRANSACTIONS_OUT, transactionDataFrame):
     merged.reset_index(inplace = True)
 
     aggDict = {x:'first' for x in list(merged)}
-    # aggDict.update(
-    #     {
-    #         'createdAt': 'first',
-    #         'id': 'first'
-    #     }
-    # )
 
     merged = merged.groupby('id').aggregate(aggDict)
     
@@ -216,37 +133,6 @@ def backFillBalances(transactionDataFrame):
     transactionDataFrame.sort_index(ascending = False, inplace = True)
     return transactionDataFrame
 
-# def TransactionsByAccount():
-#     accountNames = [x[0] for x in accounts]
-#     accountTransactions = {name: [] for name in accountNames}
-
-#     for account in accounts:
-#         name, accountType, accountID = account
-#         print(f'Getting transactions for {name}')
-#         fullUrl = f'{BASE_URL}/accounts/{accountID}/transactions'
-        
-#         request = firstRequest(
-#             url = fullUrl,
-#             headers = HEADERS,
-#             params = params
-#         )
-
-#         allData = iteratePages(
-#             request=request,
-#             url = fullUrl,
-#             headers = HEADERS,
-#             params = params
-#         )
-
-#         allDataFlat = [flattenDictionary(x) for x in allData]
-#         df = pd.DataFrame.from_dict(allDataFlat)
-#         df.insert(len(list(df)), 'account', name)
-
-#         accountTransactions[name] = df
-#     allTransactions = pd.concat(accountTransactions)
-#     allTransactions.index = range(len(allTransactions))
-
-
 def splitByAccount(transactionDataFrame):
 
     accountNames = np.unique(transactionDataFrame['accountName'])
@@ -256,7 +142,6 @@ def splitByAccount(transactionDataFrame):
         transactionsByAccount[name] = transactionDataFrame[transactionDataFrame['accountName'] == name]
 
     return transactionsByAccount
-
 
 
 if __name__ == '__main__':
