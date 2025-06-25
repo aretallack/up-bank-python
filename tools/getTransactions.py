@@ -105,7 +105,11 @@ def backFillBalances(transactionDataFrame):
     # Find index of first NA balance
     # No point looking through rows before this point
     # Probably 0 if addTrueBalance() has just been run.
-    startIndex = transactionDataFrame[transactionDataFrame[balanceCols].isna().any(axis=1)].index[0]
+    startIndex = transactionDataFrame[transactionDataFrame[balanceCols].isna().any(axis=1)].index
+    if len(startIndex) > 0:
+        startIndex = startIndex[0]
+    else:
+        startIndex = 0
 
     # From this point, iterate through to the current time
     i = startIndex
@@ -203,10 +207,6 @@ if __name__ == '__main__':
         for name in noTransactionSavers:
             transactionDataFrame.loc[:,name] = 0
     
-    # Reverse direction of dataframe to forward fill (Effectively backwards fill)
-    # transactionDataFrame = transactionDataFrame[::-1]
-    # Fill forward in the reversed frame = fill upward in the original
-
     transactionDataFrame[list(balance.keys())] = transactionDataFrame[list(balance.keys())].bfill()
     
     if since != None:
